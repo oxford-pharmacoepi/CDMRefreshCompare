@@ -1,24 +1,24 @@
 
 #' Compare Record Counts Between Two OMOP CDMs
 #'
-#' Compares the number of records in selected tables
-#' across two CDM database connections.
+#' Compare table-level record counts across two CDM
+#' database connections using OHDSI DatabaseConnector.
 #'
-#' @param con_old A DBI connection to the previous CDM.
-#' @param con_new A DBI connection to the refreshed CDM.
-#' @param schema_old Schema containing the previous CDM.
-#' @param schema_new Schema containing the refreshed CDM.
+#' @param con_old DatabaseConnector connection to the old CDM.
+#' @param con_new DatabaseConnector connection to the new CDM.
+#' @param schema_old Schema containing the old CDM.
+#' @param schema_new Schema containing the new CDM.
 #' @param tables Character vector of CDM table names.
 #'
-#' @return A data.frame with old and new record counts,
-#'   absolute differences, and percentage changes.
+#' @return A data frame containing record counts,
+#'   absolute differences and percentage changes.
 #'
 #' @export
 compareCounts <- function(
     con_old,
     con_new,
-    schema_old = NULL,
-    schema_new = NULL,
+    schema_old,
+    schema_new,
     tables = c(
       "person",
       "condition_occurrence",
@@ -29,38 +29,75 @@ compareCounts <- function(
     )
 ) {
 
-  # Helper function: count rows in one table
-  count_rows <- function(con, schema, table) {
-
-    # Build a safe database table identifier
-    table_id <- if (is.null(schema)) {
-      table
-    } else {
-      DBI::Id(schema = schema, table = table)
-    }
-
-    # Stop if the table cannot be found
-    if (!DBI::dbExistsTable(con, table_id)) {
-      stop("Table not found: ", table)
-    }
-
-    # Quote the identifier for the database
-    quoted_table <- DBI::dbQuoteIdentifier(
-      con, table_id
-    )
-
-    # Execute COUNT(*) inside the database
-    sql <- paste0(
-      "SELECT COUNT(*) AS n FROM ",
-      as.character(quoted_table)
-    )
-
-    result <- DBI::dbGetQuery(con, sql)
-
-    as.numeric(result$n[[1]])
+  # Validate schema and table names
+  valid_name <- function(x) {
+    is.character(x) &&
+      length(x) == 1 &&
+      !is.na(x) &&
+      grepl("^[A-Za-z_][A-Za-z0-9_]*$", x)
   }
 
-  # Compare every requested table
+  valid_schema <- function(x) {
+    is.character(x) &&
+      length(x) == 1 &&
+      !is.na(x) &&
+      all(vapply(
+        strsplit(x, ".", fixed = TRUE)[[1]],
+        valid_name,
+        logical(1)
+      ))
+  }
+
+  if (!valid_schema(schema_old) ||
+      !valid_schema(schema_new)) {
+    stop("Invalid CDM schema name.")
+  }
+
+  if (length(tables) == 0 ||
+      !all(vapply(tables, valid_name, logical(1)))) {
+    stop("Invalid CDM table names.")
+  }
+
+  # Query record count using DatabaseConnector
+  count_rows <- function(connection, schema, table) {
+
+    # Create SQL query
+    sql <- paste0(
+      "SELECT COUNT(*) AS record_count FROM ",
+      schema, ".", table
+    )
+
+    # Execute SQL using DatabaseConnector
+    result <- DatabaseConnector::querySql(
+      connection = connection,
+      sql = sql
+    )
+
+    # Check the returned data
+    if (nrow(result) != 1 || ncol(result) != 1) {
+      stop(
+        "Unexpected query result for table: ",
+        table
+      )
+    }
+
+    # Extract the first value regardless of column name
+    count <- as.numeric(result[[1]][[1]])
+
+    # Ensure the count is valid
+    if (length(count) != 1 ||
+        is.na(count) ||
+        !is.finite(count)) {
+      stop(
+        "Invalid record count returned for table: ",
+        table
+      )
+    }
+
+    return(count)
+  }
+
+  # Compare each CDM table
   results <- lapply(tables, function(table) {
 
     old_count <- count_rows(
@@ -84,12 +121,9 @@ compareCounts <- function(
       old_count = old_count,
       new_count = new_count,
       difference = difference,
-      percent_change = round(
-        percent_change, 2
-      )
+      percent_change = round(percent_change, 2)
     )
   })
 
-  # Combine individual results
   do.call(rbind, results)
 }
