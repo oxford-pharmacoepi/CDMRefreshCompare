@@ -1,14 +1,14 @@
 
 #' Compare Two OMOP CDM Refreshes
 #'
-#' Runs the available comparison checks between
-#' a previous and a refreshed OMOP CDM.
+#' Run table-level comparisons between an old and a
+#' refreshed OMOP CDM using DatabaseConnector.
 #'
-#' @param con_old DBI connection to the old CDM.
-#' @param con_new DBI connection to the new CDM.
+#' @param con_old Connection to the old CDM.
+#' @param con_new Connection to the refreshed CDM.
 #' @param schema_old Schema of the old CDM.
 #' @param schema_new Schema of the new CDM.
-#' @param tables Tables to compare.
+#' @param tables Character vector of tables to compare.
 #'
 #' @return A list containing comparison results.
 #'
@@ -16,8 +16,8 @@
 compareCdm <- function(
     con_old,
     con_new,
-    schema_old = NULL,
-    schema_new = NULL,
+    schema_old,
+    schema_new,
     tables = c(
       "person",
       "condition_occurrence",
@@ -28,6 +28,8 @@ compareCdm <- function(
     )
 ) {
 
+  message("Starting CDM refresh comparison...")
+
   counts <- compareCounts(
     con_old = con_old,
     con_new = con_new,
@@ -36,7 +38,9 @@ compareCdm <- function(
     tables = tables
   )
 
-  list(
+  message("CDM refresh comparison completed.")
+
+  return(list(
     counts = counts
-  )
+  ))
 }

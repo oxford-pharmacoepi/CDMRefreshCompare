@@ -7,27 +7,27 @@
 compareCdm(
   con_old,
   con_new,
-  schema_old = NULL,
-  schema_new = NULL,
+  schema_old,
+  schema_new,
   tables = c("person", "condition_occurrence", "drug_exposure", "measurement",
     "visit_occurrence", "observation")
 )
 }
 \arguments{
-\item{con_old}{DBI connection to the old CDM.}
+\item{con_old}{Connection to the old CDM.}
 
-\item{con_new}{DBI connection to the new CDM.}
+\item{con_new}{Connection to the refreshed CDM.}
 
 \item{schema_old}{Schema of the old CDM.}
 
 \item{schema_new}{Schema of the new CDM.}
 
-\item{tables}{Tables to compare.}
+\item{tables}{Character vector of tables to compare.}
 }
 \value{
 A list containing comparison results.
 }
 \description{
-Runs the available comparison checks between
-a previous and a refreshed OMOP CDM.
+Run table-level comparisons between an old and a
+refreshed OMOP CDM using DatabaseConnector.
 }

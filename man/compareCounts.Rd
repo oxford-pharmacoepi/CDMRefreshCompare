@@ -7,28 +7,28 @@
 compareCounts(
   con_old,
   con_new,
-  schema_old = NULL,
-  schema_new = NULL,
+  schema_old,
+  schema_new,
   tables = c("person", "condition_occurrence", "drug_exposure", "measurement",
     "visit_occurrence", "observation")
 )
 }
 \arguments{
-\item{con_old}{A DBI connection to the previous CDM.}
+\item{con_old}{DatabaseConnector connection to the old CDM.}
 
-\item{con_new}{A DBI connection to the refreshed CDM.}
+\item{con_new}{DatabaseConnector connection to the new CDM.}
 
-\item{schema_old}{Schema containing the previous CDM.}
+\item{schema_old}{Schema containing the old CDM.}
 
-\item{schema_new}{Schema containing the refreshed CDM.}
+\item{schema_new}{Schema containing the new CDM.}
 
 \item{tables}{Character vector of CDM table names.}
 }
 \value{
-A data.frame with old and new record counts,
-absolute differences, and percentage changes.
+A data frame containing record counts,
+absolute differences and percentage changes.
 }
 \description{
-Compares the number of records in selected tables
-across two CDM database connections.
+Compare table-level record counts across two CDM
+database connections using OHDSI DatabaseConnector.
 }
