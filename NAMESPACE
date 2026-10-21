@@ -2,3 +2,4 @@
 
 export(compareCdm)
 export(compareCounts)
+export(launchComparisonExplorer)
