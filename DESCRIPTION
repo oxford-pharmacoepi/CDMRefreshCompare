@@ -1,0 +1,21 @@
+Package: CDMRefreshCompare
+Title: Compare OMOP CDM Data Refreshes
+Version: 0.1.0
+Authors@R: 
+    person("Mandickel", "Kamtengeni", , "mandickel@gmail.com", role = c("aut", "cre"))
+Description: Provides tools for comparing successive
+    refreshes of the Observational Medical Outcomes
+    Partnership Common Data Model (OMOP CDM).
+    Supports table-level record count comparisons
+    to help developers investigate changes after
+    extract, transform, and load (ETL) processes.
+License: MIT
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Imports:
+    DBI
+Suggests:
+    RSQLite,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.1
