@@ -20,22 +20,24 @@ library(DatabaseConnector)
 # [*] EDIT BELOW -------------------------------------------------------------
 
 # Connection to the PREVIOUS CDM
+oldServer <- "host/database"
 oldConnectionDetails <- DatabaseConnector::createConnectionDetails(
   dbms = "postgresql",
   user = "",
   password = "",
-  server = "host/database",
+  server = oldServer,
   port = ,
   pathToDriver = here::here()
 )
 oldCdmDatabaseSchema <- ""
 
 # Connection to the REFRESHED CDM
+newServer <- "host/database"
 newConnectionDetails <- DatabaseConnector::createConnectionDetails(
   dbms = "postgresql",
   user = "",
   password = "",
-  server = "host/database",
+  server = oldServer,
   port = ,
   pathToDriver = here::here()
 )
@@ -90,3 +92,24 @@ tryCatch({
   if (!is.null(newConnection)) DatabaseConnector::disconnect(newConnection)
   if (!is.null(oldConnection)) DatabaseConnector::disconnect(oldConnection)
 })
+
+
+#' Setup and view results in ShinyApp
+
+install.packages(c("shiny","ggplot2","DT"))
+
+# Launch the CDM comparison dashboard
+
+# Automatically extract CDM database names
+oldCdmName <- sub("^.*/", "", oldServer)
+newCdmName <- sub("^.*/", "", newServer)
+
+
+CDMRefreshCompare::launchComparisonExplorer(
+  resultsFile = file.path(
+    outputFolder,
+    "cdm_refresh_counts.csv"
+  ),
+  oldCdmName = oldCdmName,
+  newCdmName = newCdmName
+)
