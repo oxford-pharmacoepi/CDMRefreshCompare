@@ -22,7 +22,7 @@ library(DatabaseConnector)
 # Connection to the PREVIOUS CDM
 oldServer <- "host/database"
 oldConnectionDetails <- DatabaseConnector::createConnectionDetails(
-  dbms = "",
+  dbms = "postgresql",
   user = "",
   password = "",
   server = oldServer,
@@ -34,7 +34,7 @@ oldCdmDatabaseSchema <- ""
 # Connection to the REFRESHED CDM
 newServer <- "host/database"
 newConnectionDetails <- DatabaseConnector::createConnectionDetails(
-  dbms = "",
+  dbms = "postgresql",
   user = "",
   password = "",
   server = newServer,
