@@ -5,7 +5,7 @@
 # must be migrated before running this script.
 
 # INSTALL DEPENDENCIES --------------------------------------------------------
-packages <- c("remotes", "devtools", "DatabaseConnector", "here")
+packages <- c("remotes", "devtools", "DatabaseConnector", "here" , "shiny" , "ggplot2" ,"DT")
 missing <- packages[!vapply(packages, requireNamespace, logical(1), quietly = TRUE)]
 if (length(missing)) install.packages(missing)
 
@@ -22,7 +22,7 @@ library(DatabaseConnector)
 # Connection to the PREVIOUS CDM
 oldServer <- "host/database"
 oldConnectionDetails <- DatabaseConnector::createConnectionDetails(
-  dbms = "postgresql",
+  dbms = "",
   user = "",
   password = "",
   server = oldServer,
@@ -34,10 +34,10 @@ oldCdmDatabaseSchema <- ""
 # Connection to the REFRESHED CDM
 newServer <- "host/database"
 newConnectionDetails <- DatabaseConnector::createConnectionDetails(
-  dbms = "postgresql",
+  dbms = "",
   user = "",
   password = "",
-  server = oldServer,
+  server = newServer,
   port = ,
   pathToDriver = here::here()
 )
@@ -45,8 +45,9 @@ newCdmDatabaseSchema <- ""
 
 # Tables to compare
 cdmTables <- c(
-  "person", "condition_occurrence", "drug_exposure",
-  "measurement", "visit_occurrence", "observation"
+  "PERSON","OBSERVATION_PERIOD","VISIT_OCCURRENCE","VISIT_DETAIL","CONDITION_OCCURRENCE","DRUG_EXPOSURE","PROCEDURE_OCCURRENCE","DEVICE_EXPOSURE",
+  "MEASUREMENT","OBSERVATION","DEATH","SPECIMEN","LOCATION","CARE_SITE","PROVIDER","DRUG_ERA","CONDITION_ERA","CONCEPT","VOCABULARY","CONCEPT_CLASS",
+  "CONCEPT_RELATIONSHIP","RELATIONSHIP","CONCEPT_SYNONYM","CONCEPT_ANCESTOR","SOURCE_TO_CONCEPT_MAP","DRUG_STRENGTH"
 )
 
 # Folder for results
@@ -93,10 +94,6 @@ tryCatch({
   if (!is.null(oldConnection)) DatabaseConnector::disconnect(oldConnection)
 })
 
-
-#' Setup and view results in ShinyApp
-
-install.packages(c("shiny","ggplot2","DT"))
 
 # Launch the CDM comparison dashboard
 
