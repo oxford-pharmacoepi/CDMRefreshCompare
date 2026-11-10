@@ -3,7 +3,21 @@ library(shiny)
 library(ggplot2)
 library(DT)
 library(plotly)
+# ============================================================
+# OMOP VOCABULARY TABLES
+# ============================================================
 
+vocabularyTables <- c(
+  "CONCEPT",
+  "VOCABULARY",
+  "DOMAIN",
+  "CONCEPT_CLASS",
+  "RELATIONSHIP",
+  "CONCEPT_RELATIONSHIP",
+  "CONCEPT_ANCESTOR",
+  "CONCEPT_SYNONYM",
+  "DRUG_STRENGTH"
+)
 # ============================================================
 # 1. GET CDM NAMES AND RESULTS FILE
 # ============================================================
@@ -121,12 +135,22 @@ ui <- fluidPage(
       hr(),
 
       selectInput(
-        "tables",
-        "Tables to display",
+        inputId = "tableCategory",
+        label = "Table category",
+        choices = c(
+          "All tables" = "all",
+          "CDM tables" = "cdm",
+          "Vocabulary tables" = "vocabulary"
+        ),
+        selected = "all"
+      ),
+      # Select individual tables within the chosen category
+      selectInput(
+        inputId = "tables",
+        label = "Tables to display",
         choices = NULL,
         multiple = TRUE
       ),
-
       downloadButton(
         "download",
         "Download filtered CSV"
@@ -178,7 +202,7 @@ ui <- fluidPage(
       # INTERACTIVE CHART
       # ------------------------------------------------------
 
-      h3("Change by CDM table"),
+      h3(textOutput("chartTitle")),
 
       p(
         "Hover over a bar to see the record counts. ",
@@ -212,6 +236,17 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
 
+  output$chartTitle <- renderText({
+
+    switch(
+      input$tableCategory,
+      "cdm" = "Change by CDM table",
+      "vocabulary" = "Change by vocabulary table",
+      "all" = "Change by all OMOP tables"
+    )
+
+  })
+
   # ----------------------------------------------------------
   # LOAD RESULTS
   # ----------------------------------------------------------
@@ -222,17 +257,28 @@ server <- function(input, output, session) {
     ignoreNULL = FALSE
   )
 
-  observeEvent(results(), {
+  observeEvent(
+    list(results(), input$tableCategory),
+    {
+      x <- results()
 
-    tbl <- results()$table
+      isVocabulary <- toupper(x$table) %in%
+        vocabularyTables
 
-    updateSelectInput(
-      session,
-      "tables",
-      choices = tbl,
-      selected = tbl
-    )
-  })
+      if (input$tableCategory == "vocabulary") {
+        x <- x[isVocabulary, , drop = FALSE]
+      } else if (input$tableCategory == "cdm") {
+        x <- x[!isVocabulary, , drop = FALSE]
+      }
+
+      updateSelectInput(
+        session,
+        "tables",
+        choices = x$table,
+        selected = x$table
+      )
+    }
+  )
 
   # ----------------------------------------------------------
   # FILTER RESULTS
@@ -242,13 +288,34 @@ server <- function(input, output, session) {
 
     x <- results()
 
-    req(input$tables)
+    # Apply category filter first
+    isVocabulary <- toupper(x$table) %in%
+      vocabularyTables
 
-    x[
-      x$table %in% input$tables,
+    if (input$tableCategory == "vocabulary") {
+
+      x <- x[isVocabulary, , drop = FALSE]
+
+    } else if (input$tableCategory == "cdm") {
+
+      x <- x[!isVocabulary, , drop = FALSE]
+
+    }
+
+    # Apply selected table filter
+    selectedTables <- input$tables
+
+    if (is.null(selectedTables)) {
+      selectedTables <- character(0)
+    }
+
+    x <- x[
+      x$table %in% selectedTables,
       ,
       drop = FALSE
     ]
+
+    x
   })
 
   # ----------------------------------------------------------
