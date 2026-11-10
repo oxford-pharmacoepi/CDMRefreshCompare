@@ -1,6 +1,12 @@
+
 library(shiny)
 library(ggplot2)
 library(DT)
+library(plotly)
+
+# ============================================================
+# 1. GET CDM NAMES AND RESULTS FILE
+# ============================================================
 
 oldCdmName <- getOption(
   "CDMRefreshCompare.oldCdmName",
@@ -12,51 +18,134 @@ newCdmName <- getOption(
   "New CDM"
 )
 
-# Get the CSV path passed by launchComparisonExplorer()
 result_file <- getOption(
   "CDMRefreshCompare.resultsFile",
   default = NULL
 )
 
-# Make sure a results path was provided
 if (is.null(result_file)) {
   stop(
     "No results file provided. ",
-    "Please launch the dashboard using ",
-    "CDMRefreshCompare::launchComparisonExplorer()."
+    "Launch using launchComparisonExplorer()."
   )
 }
 
-# Convert to an absolute path
 result_file <- normalizePath(
   result_file,
   mustWork = TRUE
 )
 
+# ============================================================
+# 2. READ COMPARISON RESULTS
+# ============================================================
+
 read_results <- function(path) {
-  validate(need(file.exists(path), paste("Results file not found:", path)))
-  x <- tryCatch(read.csv(path, stringsAsFactors = FALSE), error = function(e) NULL)
-  validate(need(!is.null(x), "Unable to read the results CSV."))
-  required <- c("table", "old_count", "new_count", "difference", "percent_change")
-  validate(need(all(required %in% names(x)), paste("CSV must contain:", paste(required, collapse = ", "))))
-  for (nm in required[-1]) x[[nm]] <- suppressWarnings(as.numeric(x[[nm]]))
-  validate(need(!anyNA(x[, c("old_count", "new_count", "difference")]), "Invalid numeric counts in CSV."))
+
+  validate(
+    need(
+      file.exists(path),
+      paste("Results file not found:", path)
+    )
+  )
+
+  x <- tryCatch(
+    read.csv(path, stringsAsFactors = FALSE),
+    error = function(e) NULL
+  )
+
+  validate(
+    need(!is.null(x), "Unable to read the results CSV.")
+  )
+
+  required <- c(
+    "table",
+    "old_count",
+    "new_count",
+    "difference",
+    "percent_change"
+  )
+
+  validate(
+    need(
+      all(required %in% names(x)),
+      paste(
+        "CSV must contain:",
+        paste(required, collapse = ", ")
+      )
+    )
+  )
+
+  for (nm in required[-1]) {
+    x[[nm]] <- suppressWarnings(
+      as.numeric(x[[nm]])
+    )
+  }
+
+  validate(
+    need(
+      !anyNA(x[, c(
+        "old_count",
+        "new_count",
+        "difference"
+      )]),
+      "Invalid numeric counts in CSV."
+    )
+  )
+
   x
 }
 
+# ============================================================
+# 3. SHINY USER INTERFACE
+# ============================================================
+
 ui <- fluidPage(
-  titlePanel("CDMRefreshCompare | Refresh dashboard"),
+
+  titlePanel("CDMRefreshCompare dashboard"),
+
   sidebarLayout(
+
     sidebarPanel(
-      textInput("file", "Comparison CSV path", value = result_file),
-      actionButton("reload", "Load results"),
+
+      textInput(
+        "file",
+        "Comparison CSV path",
+        value = result_file
+      ),
+
+      actionButton(
+        "reload",
+        "Load results"
+      ),
+
       hr(),
-      selectInput("tables", "Tables to display", choices = NULL, multiple = TRUE),
-      downloadButton("download", "Download filtered CSV"),
-      helpText("The dashboard reads saved aggregate results. No database connection is needed.")
+
+      selectInput(
+        "tables",
+        "Tables to display",
+        choices = NULL,
+        multiple = TRUE
+      ),
+
+      downloadButton(
+        "download",
+        "Download filtered CSV"
+      ),
+
+      helpText(
+        "The dashboard reads saved aggregate results. ",
+        "No database connection is needed."
+      )
     ),
+
     mainPanel(
+
+      # ------------------------------------------------------
+      # SUMMARY CARDS
+      # ------------------------------------------------------
+
       fluidRow(
+
         column(
           4,
           wellPanel(
@@ -65,6 +154,7 @@ ui <- fluidPage(
             p("Total records")
           )
         ),
+
         column(
           4,
           wellPanel(
@@ -73,6 +163,7 @@ ui <- fluidPage(
             p("Total records")
           )
         ),
+
         column(
           4,
           wellPanel(
@@ -82,47 +173,424 @@ ui <- fluidPage(
           )
         )
       ),
+
+      # ------------------------------------------------------
+      # INTERACTIVE CHART
+      # ------------------------------------------------------
+
       h3("Change by CDM table"),
-      plotOutput("changes", height = "350px"),
+
+      p(
+        "Hover over a bar to see the record counts. ",
+        "Click a bar to view a detailed comparison."
+      ),
+
+      plotlyOutput(
+        "changes",
+        height = "600px"
+      ),
+
+      # ------------------------------------------------------
+      # RESULTS TABLE
+      # ------------------------------------------------------
+
       h3("Comparison details"),
+
       DTOutput("comparison"),
-      p("A change in record counts does not necessarily indicate an ETL error.")
+
+      p(
+        "A change in record counts does not necessarily ",
+        "indicate an ETL error."
+      )
     )
   )
 )
 
+# ============================================================
+# 4. SHINY SERVER
+# ============================================================
+
 server <- function(input, output, session) {
-  results <- eventReactive(input$reload, read_results(input$file), ignoreNULL = FALSE)
+
+  # ----------------------------------------------------------
+  # LOAD RESULTS
+  # ----------------------------------------------------------
+
+  results <- eventReactive(
+    input$reload,
+    read_results(input$file),
+    ignoreNULL = FALSE
+  )
+
   observeEvent(results(), {
+
     tbl <- results()$table
-    updateSelectInput(session, "tables", choices = tbl, selected = tbl)
+
+    updateSelectInput(
+      session,
+      "tables",
+      choices = tbl,
+      selected = tbl
+    )
   })
+
+  # ----------------------------------------------------------
+  # FILTER RESULTS
+  # ----------------------------------------------------------
+
   filtered <- reactive({
+
     x <- results()
+
     req(input$tables)
-    x[x$table %in% input$tables, , drop = FALSE]
+
+    x[
+      x$table %in% input$tables,
+      ,
+      drop = FALSE
+    ]
   })
-  output$old_total <- renderText(format(sum(filtered()$old_count), big.mark = ",", scientific = FALSE))
-  output$new_total <- renderText(format(sum(filtered()$new_count), big.mark = ",", scientific = FALSE))
+
+  # ----------------------------------------------------------
+  # SUMMARY CARDS
+  # ----------------------------------------------------------
+
+  output$old_total <- renderText({
+
+    format(
+      sum(filtered()$old_count),
+      big.mark = ",",
+      scientific = FALSE
+    )
+  })
+
+  output$new_total <- renderText({
+
+    format(
+      sum(filtered()$new_count),
+      big.mark = ",",
+      scientific = FALSE
+    )
+  })
+
   output$delta <- renderText({
+
     x <- filtered()
+
     old <- sum(x$old_count)
-    if (old == 0) return("N/A")
-    sprintf("%+.2f%%", 100 * (sum(x$new_count) - old) / old)
+
+    if (old == 0) {
+      return("N/A")
+    }
+
+    sprintf(
+      "%+.2f%%",
+      100 * (sum(x$new_count) - old) / old
+    )
   })
-  output$changes <- renderPlot({
+
+  # ----------------------------------------------------------
+  # INTERACTIVE PLOTLY CHART
+  # ----------------------------------------------------------
+
+  output$changes <- renderPlotly({
+
     x <- filtered()
-    validate(need(nrow(x) > 0, "Select at least one table."))
-    ggplot(x, aes(x = reorder(table, percent_change), y = percent_change)) +
-      geom_col(fill = "#2376a5", na.rm = TRUE) + coord_flip() +
-      labs(x = "CDM table", y = "Change (%)") + theme_minimal(base_size = 12)
+
+    validate(
+      need(
+        nrow(x) > 0,
+        "Select at least one table."
+      )
+    )
+
+    # Create formatted hover information
+    x$hover_text <- paste0(
+      "<b>", x$table, "</b>",
+      "<br>", oldCdmName, ": ",
+      format(
+        x$old_count,
+        big.mark = ",",
+        scientific = FALSE
+      ),
+      "<br>", newCdmName, ": ",
+      format(
+        x$new_count,
+        big.mark = ",",
+        scientific = FALSE
+      ),
+      "<br>Difference: ",
+      format(
+        x$difference,
+        big.mark = ",",
+        scientific = FALSE
+      ),
+      "<br>Change: ",
+      ifelse(
+        is.na(x$percent_change),
+        "N/A",
+        paste0(
+          round(x$percent_change, 2),
+          "%"
+        )
+      )
+    )
+
+    # Plotly interactive bar chart
+    p <- plot_ly(
+      data = x,
+      x = ~percent_change,
+      y = ~table,
+      type = "bar",
+      orientation = "h",
+      key = ~table,
+      text = ~hover_text,
+      hoverinfo = "text",
+      source = "cdm_table_chart",
+      marker = list(
+        color = "#2376A5"
+      )
+    )
+
+    p <- layout(
+      p,
+      xaxis = list(
+        title = "Change (%)",
+        zeroline = TRUE
+      ),
+      yaxis = list(
+        title = "CDM table",
+        automargin = TRUE,
+        categoryorder = "total ascending"
+      ),
+      margin = list(
+        l = 180,
+        r = 30,
+        b = 60,
+        t = 30
+      )
+    )
+
+    event_register(
+      p,
+      "plotly_click"
+    )
   })
+
+  # ----------------------------------------------------------
+  # CLICK-TO-DRILL-DOWN
+  # ----------------------------------------------------------
+
+  observeEvent(
+    event_data(
+      "plotly_click",
+      source = "cdm_table_chart",
+      priority = "event"
+    ),
+    {
+
+      click <- event_data(
+        "plotly_click",
+        source = "cdm_table_chart"
+      )
+
+      req(click)
+      req("key" %in% names(click))
+
+      selectedTable <- as.character(
+        click$key[[1]]
+      )
+
+      x <- filtered()
+
+      selectedData <- x[
+        x$table == selectedTable,
+        ,
+        drop = FALSE
+      ]
+
+      req(nrow(selectedData) == 1)
+
+      comparisonData <- data.frame(
+        CDM = c(
+          oldCdmName,
+          newCdmName
+        ),
+        Records = c(
+          selectedData$old_count,
+          selectedData$new_count
+        )
+      )
+
+      # Show detailed popup
+      showModal(
+        modalDialog(
+
+          title = paste(
+            "CDM table:",
+            selectedTable
+          ),
+
+          fluidRow(
+
+            column(
+              6,
+              wellPanel(
+                h4(oldCdmName),
+                h3(
+                  format(
+                    selectedData$old_count,
+                    big.mark = ","
+                  )
+                )
+              )
+            ),
+
+            column(
+              6,
+              wellPanel(
+                h4(newCdmName),
+                h3(
+                  format(
+                    selectedData$new_count,
+                    big.mark = ","
+                  )
+                )
+              )
+            )
+          ),
+
+          h4("Record count comparison"),
+
+          plotlyOutput(
+            "tableDrilldown",
+            height = "350px"
+          ),
+
+          hr(),
+
+          h4("Difference"),
+
+          p(
+            paste(
+              "Absolute difference:",
+              format(
+                selectedData$difference,
+                big.mark = ","
+              )
+            )
+          ),
+
+          p(
+            paste(
+              "Percentage change:",
+              if (
+                is.na(selectedData$percent_change)
+              ) {
+                "N/A"
+              } else {
+                paste0(
+                  round(
+                    selectedData$percent_change,
+                    2
+                  ),
+                  "%"
+                )
+              }
+            )
+          ),
+
+          p(
+            "Record-count changes do not necessarily ",
+            "indicate ETL errors."
+          ),
+
+          easyClose = TRUE,
+
+          footer = modalButton("Close"),
+
+          size = "l"
+        )
+      )
+
+      # Render detailed chart
+      output$tableDrilldown <- renderPlotly({
+
+        plot_ly(
+          data = comparisonData,
+          x = ~CDM,
+          y = ~Records,
+          type = "bar",
+          color = ~CDM,
+          colors = c(
+            "#2376A5",
+            "#42A58C"
+          ),
+          text = ~format(
+            Records,
+            big.mark = ",",
+            scientific = FALSE
+          ),
+          textposition = "auto",
+          hovertemplate = paste0(
+            "<b>%{x}</b>",
+            "<br>Records: %{y:,}",
+            "<extra></extra>"
+          )
+        ) |>
+          layout(
+            showlegend = FALSE,
+            yaxis = list(
+              title = "Number of records",
+              rangemode = "tozero",
+              tickformat = ","
+            ),
+            xaxis = list(
+              title = ""
+            )
+          )
+      })
+    }
+  )
+
+  # ----------------------------------------------------------
+  # INTERACTIVE RESULTS TABLE
+  # ----------------------------------------------------------
+
   output$comparison <- renderDT({
-    datatable(filtered(), rownames = FALSE, options = list(pageLength = 10, scrollX = TRUE), filter = "top")
+
+    datatable(
+      filtered(),
+      rownames = FALSE,
+      options = list(
+        pageLength = 10,
+        scrollX = TRUE
+      ),
+      filter = "top"
+    )
   })
+
+  # ----------------------------------------------------------
+  # DOWNLOAD RESULTS
+  # ----------------------------------------------------------
+
   output$download <- downloadHandler(
-    filename = function() paste0("cdm_comparison_", Sys.Date(), ".csv"),
-    content = function(file) write.csv(filtered(), file, row.names = FALSE)
+
+    filename = function() {
+      paste0(
+        "cdm_comparison_",
+        Sys.Date(),
+        ".csv"
+      )
+    },
+
+    content = function(file) {
+      write.csv(
+        filtered(),
+        file,
+        row.names = FALSE
+      )
+    }
   )
 }
 
