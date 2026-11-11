@@ -14,6 +14,12 @@ if (length(missing)) install.packages(missing)
 remotes::install_github("oxford-pharmacoepi/CDMRefreshCompare")
 devtools::install(upgrade = "never")
 
+# The same PostgreSQL JDBC driver can be used for both connections.
+DatabaseConnector::downloadJdbcDrivers(
+  dbms = "postgresql",
+  pathToDriver = here::here()
+)
+
 library(CDMRefreshCompare)
 library(DatabaseConnector)
 
@@ -54,12 +60,6 @@ cdmTables <- c(
 outputFolder <- here::here("comparison_results")
 
 # [!] DO NOT EDIT BELOW ------------------------------------------------------
-
-# The same PostgreSQL JDBC driver can be used for both connections.
-DatabaseConnector::downloadJdbcDrivers(
-  dbms = "postgresql",
-  pathToDriver = here::here()
-)
 
 
 oldConnection <- NULL
