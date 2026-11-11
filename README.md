@@ -467,7 +467,7 @@ Contributions, feature suggestions, and bug reports are welcome.
 
 Please use the GitHub repository to report issues or propose improvements:
 
-https://github.com/oxford-pharmacoepi/CDMRefreshCompare
+https://github.com/oxford-pharmacoepi/CDMRefreshCompare/issues
 
 ---
 
