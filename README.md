@@ -198,9 +198,37 @@ The selected tables must exist in both CDM databases.
 Once the database connection details have been configured, run:
 
 ```r
-source(
-  here::here("extras", "CodeToRun.R")
-)
+oldConnection <- NULL
+newConnection <- NULL
+
+tryCatch({
+  oldConnection <- DatabaseConnector::connect(oldConnectionDetails)
+  newConnection <- DatabaseConnector::connect(newConnectionDetails)
+
+  comparison <- CDMRefreshCompare::compareCdm(
+    con_old = oldConnection,
+    con_new = newConnection,
+    schema_old = oldCdmDatabaseSchema,
+    schema_new = newCdmDatabaseSchema,
+    tables = cdmTables
+  )
+
+  if (!is.list(comparison) || !is.data.frame(comparison$counts)) {
+    stop("Expected compareCdm() to return a list containing $counts.")
+  }
+
+  dir.create(outputFolder, recursive = TRUE, showWarnings = FALSE)
+  outputFile <- file.path(outputFolder, "cdm_refresh_counts.csv")
+  write.csv(comparison$counts, outputFile, row.names = FALSE)
+  print(comparison$counts)
+  message("Results saved to: ", normalizePath(outputFile))
+}, error = function(e) {
+  message("CDM comparison failed: ", conditionMessage(e))
+  stop(e)
+}, finally = {
+  if (!is.null(newConnection)) DatabaseConnector::disconnect(newConnection)
+  if (!is.null(oldConnection)) DatabaseConnector::disconnect(oldConnection)
+})
 ```
 
 The script will:
@@ -252,6 +280,9 @@ CDMRefreshCompare includes an interactive Shiny application for exploring compar
 ### Launching the Dashboard
 
 ```r
+oldCdmName <- sub("^.*/", "", oldServer)
+newCdmName <- sub("^.*/", "", newServer)
+
 CDMRefreshCompare::launchComparisonExplorer(
   resultsFile = here::here(
     "comparison_results",
